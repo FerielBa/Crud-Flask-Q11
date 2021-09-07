@@ -5,6 +5,8 @@ from flask_mysqldb import MySQL
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from functools import wraps
+from flask_mail import Mail, Message
+from config import mail_username,mail_password
 
 app = Flask(__name__)
 app.secret_key='fertoula'
@@ -18,6 +20,16 @@ app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 # init MYSQL
 mysql = MySQL(app)
 
+#init Mail
+mail = Mail(app)
+
+# Config Mail
+app.config['MAIL_SERVER'] = 'smtp-mail.outlook.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSl'] = False
+app.config['MAIL_USERNAME'] = mail_username
+app.config['MAIL_PASSWORD'] = mail_password
 #Articles = Articles()
 
 # Index
@@ -25,6 +37,22 @@ mysql = MySQL(app)
 def index():
     return render_template('home.html')
 
+
+# Contact
+@app.route("/contact", methods=['GET', 'POST'])
+def contact():
+    if request.method == "POST":
+        name = request.form.get('name')
+        email = request.form.get('email')
+        phone = request.form.get('phone')
+        message = request.form.get('message')
+
+        msg = Message(
+            subject=f"Mail from {name}", body=f"Name: {name}\nE-Mail: {email}\nPhone: {phone}\n\n\n{message}", sender=mail_username, recipients=['yourpersonalemail@protonmail.com'])
+        mail.send(msg)
+        return render_template("contact.html", success=True)
+
+    return render_template("contact.html")
 # About
 @app.route('/about')
 def about():
@@ -35,26 +63,35 @@ def about():
 def profile():
     return render_template('profile.html')
 
+
+
 # Articles
 @app.route('/articles')
 def articles():
-
     # Create cursor
     cur = mysql.connection.cursor()
 
-    # Get articles
+   # Get articles
+  
     result = cur.execute("SELECT * FROM articles")
-
     articles = cur.fetchall()
+    page=request.args.get('page')
+    if page and page.isdigit():
+        page=int(page)
+    else:
+        page=1
+    pages=articles.paginate(page=page , per_page=1)
+
 
     if result > 0:
-        return render_template('articles.html', articles=articles)
+        return render_template('articles.html', articles=articles , pages=pages
+        )
     else:
         msg = 'No Articles Found'
-        return render_template('articles.html', msg=msg)
+        return render_template('articles.html', msg=msg , pages=pages
+        )
     # Close connection
     cur.close()
-     
 #search
 @app.route('/articles')
 def search():
